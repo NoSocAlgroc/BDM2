@@ -4,7 +4,7 @@ from pyspark.sql import SparkSession
 spark = SparkSession.builder.appName("ReadFiles").getOrCreate()
 
 # Leer archivos JSON en el primer directorio y crear un DataFrame de Spark
-json_df1 = spark.read.json("./P2_data/income_opendata/income_opendata_neighborhood.json") #INCOME_DATA --> rentas
+json_df1 = spark.read.json("/Users/Marta1/PycharmProjects/BDM2/data/income_opendata/income_opendata_neighborhood.json") #INCOME_DATA --> rentas
 print("json_df1")
 print(json_df1)
 

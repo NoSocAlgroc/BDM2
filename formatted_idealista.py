@@ -4,7 +4,7 @@ from pyspark.sql import SparkSession
 spark = SparkSession.builder.appName("ReadFiles").getOrCreate()
 
 # Leer archivos Parquet y crear un DataFrame de Spark
-parquet_df = spark.read.parquet("./P2_data/idealista/2020_01_02_idealista/") #IDEALISTA --> alquileres
+parquet_df = spark.read.parquet("/Users/Marta1/PycharmProjects/BDM2/data/idealista/2020_01_02_idealista/") #IDEALISTA --> alquileres
 print("parquet_df")
 print(parquet_df)
 parquet_df.show(n=2)

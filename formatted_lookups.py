@@ -4,8 +4,8 @@ from pyspark.sql import SparkSession
 spark = SparkSession.builder.appName("ReadFiles").getOrCreate()
 
 # Leer archivos JSON en el segundo directorio y crear otro DataFrame de Spark      #LOOKUP
-json_df2 = spark.read.json("./P2_data/lookup_tables/income_lookup_district.json")
-json_df3 = spark.read.json("./P2_data/lookup_tables/income_lookup_neighborhood.json")
+json_df2 = spark.read.json("/Users/Marta1/PycharmProjects/BDM2/data/lookup_tables/income_lookup_district.json")
+json_df3 = spark.read.json("/Users/Marta1/PycharmProjects/BDM2/data/lookup_tables/income_lookup_neighborhood.json")
 print("json_df2")
 print(json_df2)
 print("json_df3")
