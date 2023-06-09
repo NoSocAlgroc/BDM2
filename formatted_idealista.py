@@ -1,4 +1,5 @@
 from pyspark.sql import SparkSession
+from pyspark.sql.types import *
 import os
 
 dir="data/idealista"
@@ -18,7 +19,7 @@ for file in files:
         keyCols=["district","neighborhood"]
         numCols=["bathrooms","numPhotos","price","priceByArea","latitude","longitude","distance"]
         boolCols=["exterior","has360","has3DTour","hasLift","hasPlan","hasStaging","hasVideo","newDevelopment","showAddress","topNewDevelopment"]
-        return (tuple((x[c] if c in x else "None" for c in keyCols))+tuple(year,),
+        return (tuple((x[c] if c in x else "None" for c in keyCols))+(int(year),),
                 tuple((float(x[c]) for c in numCols))+
                 tuple((x[c]==True for c in boolCols))+
                 tuple((1,))
@@ -41,8 +42,8 @@ distRDD = spark.read.json(os.path.join(lookupDir,"income_lookup_district.json"))
 neigRDD = spark.read.json(os.path.join(lookupDir,"income_lookup_neighborhood.json")).rdd
 
 
-distRDD=distRDD.map(lambda x:((x['district'].lower(),),(x['_id'],x['district_name'])))
-neigRDD=neigRDD.map(lambda x:((x['neighborhood'].lower(),),(x['_id'],x['neighborhood_name'])))
+distRDD=distRDD.map(lambda x:((x['district'],),(x['_id'],x['district_name'])))
+neigRDD=neigRDD.map(lambda x:((x['neighborhood'],),(x['_id'],x['neighborhood_name'])))
 
 def flattenValues(x):
     k,(v1,v2)=x
@@ -64,3 +65,28 @@ def fullKey(x):#(d),(n,y,v,nID,nName,dID,dName)
 joinedRDD=joinedRDD.map(neighKey).leftOuterJoin(neigRDD).map(flattenValues)
 joinedRDD=joinedRDD.map(distKey).leftOuterJoin(distRDD).map(flattenValues)
 joinedRDD=joinedRDD.map(fullKey)
+
+keyCols=["district","neighborhood"]
+numCols=["bathrooms","numPhotos","price","priceByArea","latitude","longitude","distance"]
+boolCols=["exterior","has360","has3DTour","hasLift","hasPlan","hasStaging","hasVideo","newDevelopment","showAddress","topNewDevelopment"]
+
+# Define the schema for your DataFrame
+schema = StructType([
+    StructField(col, StringType(), True) for col in keyCols
+] + [
+    StructField('year', IntegerType(), True)
+] + [
+    StructField(col, FloatType(), True) for col in numCols
+] + [
+    StructField(col, FloatType(), True) for col in boolCols
+] + [
+    StructField('count', IntegerType(), True),
+    StructField('neighborhoodID', StringType(), True),
+    StructField('neighborhood_name', StringType(), True),
+    StructField('districtID', StringType(), True),
+    StructField('district_name', StringType(), True)
+])
+
+# Create DataFrame with the specified schema
+df = spark.createDataFrame(joinedRDD, schema)
+df.write.mode("overwrite").parquet("hdfs://10.4.41.64:27000/user/bdm/formatted/idealista/idealista_year_district")
