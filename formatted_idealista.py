@@ -1,87 +1,66 @@
 from pyspark.sql import SparkSession
+import os
 
-# Crear una instancia de SparkSession
+dir="data/idealista"
 spark = SparkSession.builder.appName("ReadFiles").getOrCreate()
+files=[f for f in os.scandir(dir) if f.is_dir()]
 
-# Leer archivos Parquet y crear un DataFrame de Spark
-parquet_df = spark.read.parquet("/Users/Marta1/PycharmProjects/BDM2/data/idealista/2020_01_02_idealista/") #IDEALISTA --> alquileres
-print("parquet_df")
-print(parquet_df)
-parquet_df.show(n=2)
+def reduce(a,b):
+    return a[:4]+tuple(map(sum,zip(a[4:],b[4:])))
 
-# convert the DataFrame to an RDD
-parquet_rdd = parquet_df.rdd
+joinedRDD=None
 
-###3#### MAKE TRANSFORMATIONS on the json and parquet files
-###### IDEALISTA
-# idealista → dia i barri  → agrupar per any
+for file in files:
+    incomeRDD = spark.read.parquet(file.path).rdd
+    year=file.name.split("_")[0]
 
-# How many columns has the RDD
-sample_rows = parquet_rdd.take(1)
-num_columns = len(sample_rows[0])
-print("num_columns")
-print(num_columns)
+    def idealistaChangeType(x):
+        keyCols=["district","neighborhood"]
+        numCols=["bathrooms","numPhotos","price","priceByArea","latitude","longitude","distance"]
+        boolCols=["exterior","has360","has3DTour","hasLift","hasPlan","hasStaging","hasVideo","newDevelopment","showAddress","topNewDevelopment"]
+        return (tuple((x[c] if c in x else "None" for c in keyCols))+tuple(year,),
+                tuple((float(x[c]) for c in numCols))+
+                tuple((x[c]==True for c in boolCols))+
+                tuple((1,))
+                )
+    incomeRDD=incomeRDD.map(idealistaChangeType)
 
-# Distinct values from x[30]
-column_rdd = parquet_rdd.map(lambda x: x[30])
-distinct_values = column_rdd.distinct().collect()
-print("distinct_values")
-for value in distinct_values:
-    print(value)
+    incomeRDD=incomeRDD.reduceByKey(reduce)
 
-# Change type of variables and remove some of them
-def idealistaChangeType(x):
-    return (x[1],
-            x[2], #country
-            int(x[4]) if isinstance(x[4], str) else x[4],  #distance
-            x[5],  #distric
-            x[6],
-            int(x[8]) if isinstance(x[8], str) else x[8],  #floor
-            x[9],
-            x[10],
-            x[11],
-            x[12],
-            x[13],
-            x[14],
-            x[15],
-            x[16],
-            x[17],  # municipality
-            x[18],  # neighborhood
-            x[19],
-            x[20],
-            x[22],
-            x[23],
-            x[26], #province
-            x[27],
-            x[28],
-            x[29],
-            x[30]=="good", # status
-            x[33],
-            )
+    if joinedRDD is None:
+        joinedRDD=incomeRDD
+    else:
+        joinedRDD=joinedRDD.union(incomeRDD)
+joinedRDD=joinedRDD.reduceByKey(reduce)
+joinedRDD=joinedRDD.mapValues(lambda x: tuple((v/x[-1] for v in x[:-1]))+x[-1:])
 
-parquet_rdd = parquet_rdd.map(idealistaChangeType)
-print("parquet rdd")
+#Lookups
 
-# Take the first two lines of the RDD
-first_two_lines = parquet_rdd.take(2)
+lookupDir="data/lookup_tables"
+distRDD = spark.read.json(os.path.join(lookupDir,"income_lookup_district.json")).rdd
+neigRDD = spark.read.json(os.path.join(lookupDir,"income_lookup_neighborhood.json")).rdd
 
-# Print the first two lines
-for line in first_two_lines:
-    print(line)
 
-# group by barri
-parquet_rdd = parquet_rdd.groupBy(lambda x: (x[1], x[3], x[14], x[15], x[20])) #country, district, municipality, neighborhood, province
+distRDD=distRDD.map(lambda x:((x['district'].lower(),),(x['_id'],x['district_name'])))
+neigRDD=neigRDD.map(lambda x:((x['neighborhood'].lower(),),(x['_id'],x['neighborhood_name'])))
 
-# Calculate the mean of integer columns and percentage of true values for boolean columns
-#def process_row(rows):
-  #  index_num_cols = [1, 2]
-    #for i in index_num_cols:
-     #   total = 0.0
-      #  for row in rows:
-       #     total += row[i]
-#
- #       mean = total/len(rows)
-#
- #   return mean
+def flattenValues(x):
+    k,(v1,v2)=x
+    return (k,v1+v2) if v2 is not None else (k,(v1+(None,None)))
+def neighKey(x):#(d,n,y),(v)
+    k,v=x
+    return ((k[1],),(k[0],k[2])+v)#(n),(d,y,v)
 
-#processed_rdd = parquet_rdd.map(process_row)
+def distKey(x):#(n),(d,y,v,nID,nName)
+    k,v=x
+    return ((v[0],),(k[0],)+v[1:])#(d),(n,y,v,nID,nName)
+
+def fullKey(x):#(d),(n,y,v,nID,nName,dID,dName)
+    k,v=x
+    return (k+v)#(d,n,y,v,nID,nName,dID,dName)
+    #return ((v[-2],v[-4],v[1],v[2:-4],v[0],v[-3],k[0],v[-1]))#(dID,nID,y,v,n,nName,d,dName)
+
+
+joinedRDD=joinedRDD.map(neighKey).leftOuterJoin(neigRDD).map(flattenValues)
+joinedRDD=joinedRDD.map(distKey).leftOuterJoin(distRDD).map(flattenValues)
+joinedRDD=joinedRDD.map(fullKey)
