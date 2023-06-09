@@ -1,40 +1,46 @@
 from pyspark.sql import SparkSession
-
+import os
 # Crear una instancia de SparkSession
 spark = SparkSession.builder.appName("ReadFiles").getOrCreate()
 
-# Leer archivos JSON y crear otro DataFrame de Spark                       #PRICE_OPENDATA --> precio casas
-json_df4 = spark.read.json("/Users/Marta1/PycharmProjects/BDM2/price_opendata/price_opendata_neighborhood.json")
-print("json_df4")
-print(json_df4)
+jsonrdd= spark.read.json("data/price_opendata/price_opendata_neighborhood.json").rdd
+
+def extractYears(x):
+    res=[]
+    if x[3] is None:
+        return []
+    for r in x[3]:
+        tr=tuple(r)
+        res+=[(x[2:3]+x[4:]+tr[-1:],r[:-1])]#(district_name,RFD,pop,year,neigh_name)
+    return res
+jsonrdd=jsonrdd.flatMap(extractYears)
 
 
-# convert the DataFrame to an RDD
-json_rdd4 = json_df4.rdd
 
-###3#### MAKE TRANSFORMATIONS on the json and parquet files
+lookupDir="data/lookup_tables"
+distRDD = spark.read.json(os.path.join(lookupDir,"income_lookup_district.json")).rdd
+neigRDD = spark.read.json(os.path.join(lookupDir,"income_lookup_neighborhood.json")).rdd
 
-##########price_opendata_neighborhood
-print("price_opendata_neighborhood")
-json_df4.show(n=2)
 
-print("price_opendata_neighborhood rdd")
-# Take the first two lines of the RDD
-first_two_lines = json_rdd4.take(2)
+distRDD=distRDD.map(lambda x:((x['district_reconciled'],),(x['_id'],x['district_name'])))
+neigRDD=neigRDD.map(lambda x:((x['neighborhood'],),(x['_id'],x['neighborhood_name'])))
 
-# Print the first two lines
-for line in first_two_lines:
-    print(line)
+def flattenValues(x):
+    k,(v1,v2)=x
+    return (k,v1+v2) if v2 is not None else (k,(v1+(None,None)))
+def neighKey(x):#(d,n,y),(v)
+    k,v=x
+    return ((k[1],),(k[0],k[2])+v)#(n),(d,y,v)
 
-json_rdd4 = json_rdd4.flatMap(lambda row: [
-    (row._id, row.district_id, row.district_name, info.Amount, info.diffAmount, info.diffPerMeter, info.usedAmount, info.usedPerMeter, info.year, row["neigh_name "])
-    for info in row.info
-])
+def distKey(x):#(n),(d,y,v,nID,nName)
+    k,v=x
+    return ((v[0],),(k[0],)+v[1:])#(d),(n,y,v,nID,nName)
 
-print("flattened_json_rdd4 rdd")
-# Take the first two lines of the RDD
-first_two_lines = json_rdd4.take(2)
+def fullKey(x):#(d),(n,y,v,nID,nName,dID,dName)
+    k,v=x
+    return (k+v)#(d,n,y,v,nID,nName,dID,dName)
+    #return ((v[-2],v[-4],v[1],v[2:-4],v[0],v[-3],k[0],v[-1]))#(dID,nID,y,v,n,nName,d,dName)
 
-# Print the first two lines
-for line in first_two_lines:
-    print(line)
+jsonrdd=jsonrdd.map(neighKey).leftOuterJoin(neigRDD).map(flattenValues)
+jsonrdd=jsonrdd.map(distKey).leftOuterJoin(distRDD).map(flattenValues)
+jsonrdd=jsonrdd.map(fullKey)
