@@ -3,7 +3,7 @@ import os
 # Crear una instancia de SparkSession
 spark = SparkSession.builder.appName("ReadFiles").getOrCreate()
 
-jsonrdd= spark.read.json("data/price_opendata/price_opendata_neighborhood.json").rdd
+jsonrdd= spark.read.json("price_opendata/price_opendata_neighborhood.json").rdd
 
 def extractYears(x):
     res=[]
@@ -17,7 +17,7 @@ jsonrdd=jsonrdd.flatMap(extractYears)
 
 
 
-lookupDir="data/lookup_tables"
+lookupDir="lookup_tables"
 distRDD = spark.read.json(os.path.join(lookupDir,"income_lookup_district.json")).rdd
 neigRDD = spark.read.json(os.path.join(lookupDir,"income_lookup_neighborhood.json")).rdd
 
@@ -43,4 +43,7 @@ def fullKey(x):#(d),(n,y,v,nID,nName,dID,dName)
 
 jsonrdd=jsonrdd.map(neighKey).leftOuterJoin(neigRDD).map(flattenValues)
 jsonrdd=jsonrdd.map(distKey).leftOuterJoin(distRDD).map(flattenValues)
-jsonrdd=jsonrdd.map(fullKey)line)
+jsonrdd=jsonrdd.map(fullKey)
+
+df=spark.createDataFrame(jsonrdd, ['district', 'neighborhood', 'year', 'amount', 'perMeter', 'diffAmount', 'diffPerMeter', 'usedAmount', 'usedPerMeter', 'neighborhoodID','neighborhood_name','districtID','district_name'])
+df.write.mode("overwrite").parquet("hdfs://10.4.41.64:27000/user/bdm/formatted/price/price_year_district")

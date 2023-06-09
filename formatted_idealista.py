@@ -90,7 +90,3 @@ schema = StructType([
 # Create DataFrame with the specified schema
 df = spark.createDataFrame(joinedRDD, schema)
 df.write.mode("overwrite").parquet("hdfs://10.4.41.64:27000/user/bdm/formatted/idealista/idealista_year_district")
-#
-#
-#
-#

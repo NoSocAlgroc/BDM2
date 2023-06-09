@@ -46,3 +46,6 @@ def fullKey(x):#(d),(n,y,v,nID,nName,dID,dName)
 jsonrdd=jsonrdd.map(neighKey).leftOuterJoin(neigRDD).map(flattenValues)
 jsonrdd=jsonrdd.map(distKey).leftOuterJoin(distRDD).map(flattenValues)
 jsonrdd=jsonrdd.map(fullKey)
+
+df=spark.createDataFrame(jsonrdd, ['district', 'neighborhood', 'year', 'rfd', 'population', 'neighborhoodID','neighborhood_name','districtID','district_name'])
+df.write.mode("overwrite").parquet("hdfs://10.4.41.64:27000/user/bdm/formatted/income/income_year_district")
