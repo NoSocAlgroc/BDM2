@@ -7,7 +7,7 @@ spark = SparkSession.builder.appName("ReadFiles").getOrCreate()
 files=[f for f in os.scandir(dir) if f.is_dir()]
 
 def reduce(a,b):
-    return a[:4]+tuple(map(sum,zip(a[4:],b[4:])))
+    return tuple(map(sum,zip(a,b)))
 
 joinedRDD=None
 
@@ -21,7 +21,7 @@ for file in files:
         boolCols=["exterior","has360","has3DTour","hasLift","hasPlan","hasStaging","hasVideo","newDevelopment","showAddress","topNewDevelopment"]
         return (tuple((x[c] if c in x else "None" for c in keyCols))+(int(year),),
                 tuple((float(x[c]) for c in numCols))+
-                tuple((x[c]==True for c in boolCols))+
+                tuple((float(x[c]==True) for c in boolCols))+
                 tuple((1,))
                 )
     incomeRDD=incomeRDD.map(idealistaChangeType)
@@ -33,7 +33,7 @@ for file in files:
     else:
         joinedRDD=joinedRDD.union(incomeRDD)
 joinedRDD=joinedRDD.reduceByKey(reduce)
-joinedRDD=joinedRDD.mapValues(lambda x: tuple((v/x[-1] for v in x[:-1]))+x[-1:])
+
 
 #Lookups
 
