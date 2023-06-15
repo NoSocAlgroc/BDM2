@@ -6,9 +6,6 @@ dir="data/idealista"
 spark = SparkSession.builder.appName("ReadFiles").getOrCreate()
 files=[f for f in os.scandir(dir) if f.is_dir()]
 
-def reduce(a,b):
-    return tuple(map(sum,zip(a,b)))
-
 joinedRDD=None
 
 for file in files:
@@ -26,13 +23,12 @@ for file in files:
                 )
     incomeRDD=incomeRDD.map(idealistaChangeType)
 
-    incomeRDD=incomeRDD.reduceByKey(reduce)
-
+    
     if joinedRDD is None:
         joinedRDD=incomeRDD
     else:
         joinedRDD=joinedRDD.union(incomeRDD)
-joinedRDD=joinedRDD.reduceByKey(reduce)
+
 
 
 #Lookups
@@ -89,4 +85,4 @@ schema = StructType([
 
 # Create DataFrame with the specified schema
 df = spark.createDataFrame(joinedRDD, schema)
-df.write.mode("overwrite").parquet("hdfs://10.4.41.64:27000/user/bdm/formatted/idealista/idealista_year_district")
+df.write.mode("overwrite").parquet("hdfs://10.4.41.64:27000/user/bdm/formatted/idealista/idealista")
