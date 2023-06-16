@@ -3,7 +3,10 @@ from pyspark.sql.types import *
 import os
 
 dir="data/idealista"
-spark = SparkSession.builder.appName("ReadFiles").getOrCreate()
+spark = SparkSession.builder \
+    .config("spark.jars", "./postgresql-42.6.0.jar") \
+    .appName("BDM2") \
+    .getOrCreate()
 files=[f for f in os.scandir(dir) if f.is_dir()]
 
 joinedRDD=None

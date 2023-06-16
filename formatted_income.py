@@ -2,7 +2,10 @@ from pyspark.sql import SparkSession
 import os
 
 # Crear una instancia de SparkSession
-spark = SparkSession.builder.appName("ReadFiles").getOrCreate()
+spark = SparkSession.builder \
+    .config("spark.jars", "./postgresql-42.6.0.jar") \
+    .appName("BDM2") \
+    .getOrCreate()
 
 jsonrdd= spark.read.json("data/income_opendata/income_opendata_neighborhood.json").rdd
 

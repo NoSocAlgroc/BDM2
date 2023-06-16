@@ -1,7 +1,10 @@
 from pyspark.sql import SparkSession
 
 # Crear una instancia de SparkSession
-spark = SparkSession.builder.appName("ReadFiles").getOrCreate()
+spark = SparkSession.builder \
+    .config("spark.jars", "./postgresql-42.6.0.jar") \
+    .appName("BDM2") \
+    .getOrCreate()
 
 # Leer archivos JSON en el segundo directorio y crear otro DataFrame de Spark      #LOOKUP
 json_df2 = spark.read.json("/Users/Marta1/PycharmProjects/BDM2/data/lookup_tables/income_lookup_district.json")
