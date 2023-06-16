@@ -6,7 +6,7 @@ spark = SparkSession.builder \
     .appName("BDM2") \
     .getOrCreate()
 
-jsonrdd= spark.read.json("price_opendata/price_opendata_neighborhood.json").rdd
+jsonrdd= spark.read.json("data/price_opendata/price_opendata_neighborhood.json").rdd
 
 def extractYears(x):
     res=[]
@@ -20,7 +20,7 @@ jsonrdd=jsonrdd.flatMap(extractYears)
 
 
 
-lookupDir="lookup_tables"
+lookupDir="data/lookup_tables"
 distRDD = spark.read.json(os.path.join(lookupDir,"income_lookup_district.json")).rdd
 neigRDD = spark.read.json(os.path.join(lookupDir,"income_lookup_neighborhood.json")).rdd
 
